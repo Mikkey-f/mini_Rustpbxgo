@@ -11,16 +11,21 @@ const (
 	NoAuthPath = "/out"
 )
 
-func Routers(router *gin.Engine, backendForWeb *service.BackendForWeb) {
+func Routers(router *gin.Engine, backendForWeb *service.BackendForWeb, backendForRust *service.BackendForRust) {
 	//auth := router.Group(AuthPath)
 	//{
 	//
 	//}
 	noAuth := router.Group(NoAuthPath)
 	{
-		noAuth.GET("/ws/setup/text", func(c *gin.Context) {
-			backendForWeb.HandleSetUpText(c.Writer, c.Request)
+		noAuth.GET("/webrtc/setup", func(c *gin.Context) {
+			backendForWeb.HandleWebRtcSetUp(c.Writer, c.Request)
 		})
+	}
+
+	// 监听机制
+	if backendForRust.GoToRustConn != nil {
+		go backendForRust.ListenGoToRustWs(backendForWeb)
 	}
 	// 防止阻塞
 	go func() {

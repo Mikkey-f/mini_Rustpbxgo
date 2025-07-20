@@ -15,7 +15,9 @@ func main() {
 	backendForRust := service.NewBackendForRust(endPoint)
 	backendForRust.Connect(callType)
 	backendForWeb := service.NewBackendForWeb()
-	api.Routers(gin.Default(), backendForWeb)
-	bools := make(chan bool)
-	<-bools
+	backendForWeb.GoToRustConn = backendForRust.GoToRustConn
+
+	// backendForWeb和backendForRust两者要做好初始化
+	api.Routers(gin.Default(), backendForWeb, backendForRust)
+	select {}
 }

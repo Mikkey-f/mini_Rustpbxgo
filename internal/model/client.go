@@ -1,4 +1,4 @@
-package rustpbxgo
+package model
 
 import (
 	"context"

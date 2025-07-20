@@ -1,6 +1,8 @@
 <!DOCTYPE html>
 <html>
-
+<head>
+    <meta charset="UTF-8">  <!-- 添加这行声明字符编码 -->
+</head>
 <body>
     <button onclick="connectWebRTC()">建立语音连接</button>
     <button onclick="hangupCall()" id="hangupButton" disabled>挂断通话</button>
@@ -9,7 +11,7 @@
 
     <script>
         // shane: 建立 WebSocket 通信
-        const ws = new WebSocket('ws://localhost:8081/out/ws/setup/text');
+        const ws = new WebSocket('ws://localhost:8081/out/webrtc/setup');
         let peerConnection = null;
         let isConnected = false;
 

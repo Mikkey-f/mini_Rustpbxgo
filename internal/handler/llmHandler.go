@@ -24,7 +24,7 @@ type LLMHandler struct {
 	interruptCh chan struct{}
 }
 
-// ToolCall represents a function call from the LLM
+// HangupTool ToolCall represents a function call from the LLM
 type HangupTool struct {
 	Reason string `json:"reason"`
 }
