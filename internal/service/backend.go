@@ -6,12 +6,12 @@ import (
 )
 
 type BackendForRust struct {
-	GoForRustConn *websocket.Conn
+	GoFToRustConn *websocket.Conn
 	EndPoint      string
 }
 
-// CreateBackendForRust 创建go到rust的后端管理者
-func CreateBackendForRust(endPoint string) *BackendForRust {
+// NewBackendForRust 创建go到rust的后端管理者
+func NewBackendForRust(endPoint string) *BackendForRust {
 	return &BackendForRust{
 		EndPoint: endPoint,
 	}
@@ -24,9 +24,9 @@ func (backendForRust *BackendForRust) Connect(callType string) *websocket.Conn {
 
 	conn, _, err := websocket.DefaultDialer.Dial(url, nil)
 	if err != nil {
-		logrus.Fatal(err)
+		logrus.Fatal("goBackend connect rustBackend error", err)
 	}
 	logrus.Info("Successfully connected")
-	backendForRust.GoForRustConn = conn
+	backendForRust.GoFToRustConn = conn
 	return conn
 }
