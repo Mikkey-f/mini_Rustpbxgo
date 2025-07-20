@@ -19,7 +19,7 @@ func Routers(router *gin.Engine, backendForWeb *service.BackendForWeb) {
 	noAuth := router.Group(NoAuthPath)
 	{
 		noAuth.GET("/ws/setup/text", func(c *gin.Context) {
-			go backendForWeb.HandleSetUpText(c.Writer, c.Request)
+			backendForWeb.HandleSetUpText(c.Writer, c.Request)
 		})
 	}
 	// 防止阻塞
@@ -29,5 +29,5 @@ func Routers(router *gin.Engine, backendForWeb *service.BackendForWeb) {
 			log.Fatal(err, "路由建立失败")
 		}
 	}()
-	
+
 }
