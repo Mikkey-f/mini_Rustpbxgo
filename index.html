@@ -153,13 +153,14 @@
         function hangupCall() {
             if (isConnected) {
                 const hangupCommand = {
-                    command: "hangup",
+                    event: "hangup",
                     reason: "user_requested",
                     initiator: "caller"
                 };
                 ws.send(JSON.stringify(hangupCommand));
                 log('Hangup command sent');
                 document.getElementById('hangupButton').disabled = true;
+                isConnected = false
             } else {
                 log('WebRTC connection is not established.');
             }

@@ -23,10 +23,6 @@ func Routers(router *gin.Engine, backendForWeb *service.BackendForWeb, backendFo
 		})
 	}
 
-	// 监听机制
-	if backendForRust.GoToRustConn != nil {
-		go backendForRust.ListenGoToRustWs(backendForWeb)
-	}
 	// 防止阻塞
 	go func() {
 		// 阻塞进程
