@@ -8,18 +8,16 @@ import (
 	"miniRustpbxgo/internal/handler"
 	"miniRustpbxgo/internal/model"
 	"net/http"
-	"sync"
 )
 
 type BackendForWeb struct {
-	WebToGoConn       *websocket.Conn
-	Upgrader          *websocket.Upgrader
-	GoToRustConn      *websocket.Conn
-	AsrOption         *model.ASROption
-	TtsOption         *model.TTSOption
-	LLMHandler        *handler.LLMHandler
-	FrontendToGoMutex sync.Mutex
-	Model             string
+	WebToGoConn  *websocket.Conn
+	Upgrader     *websocket.Upgrader
+	GoToRustConn *websocket.Conn
+	AsrOption    *model.ASROption
+	TtsOption    *model.TTSOption
+	LLMHandler   *handler.LLMHandler
+	Model        string
 }
 
 type TtsCommand struct {
@@ -49,11 +47,11 @@ func NewBackendForWeb(asrOption *model.ASROption, ttsOption *model.TTSOption, ll
 }
 
 // HandleWebRtcSetUp 处理前端与go后端关于文本信息的传递
-func (backendForWeb *BackendForWeb) HandleWebRtcSetUp(w http.ResponseWriter, r *http.Request) {
+func (backendForWeb *BackendForWeb) HandleWebRtcSetUp(w http.ResponseWriter, r *http.Request, backendForRust *BackendForRust) {
 	//TODO
-	defer backendForWeb.FrontendToGoMutex.Unlock()
+	//defer backendForWeb.FrontendToGoMutex.Unlock()
 
-	backendForWeb.FrontendToGoMutex.Lock()
+	//backendForWeb.FrontendToGoMutex.Lock()
 	if backendForWeb.WebToGoConn != nil {
 		if err := backendForWeb.WebToGoConn.Close(); err != nil {
 			logrus.Error("frontend to goBackend closed error:", err)
@@ -68,26 +66,25 @@ func (backendForWeb *BackendForWeb) HandleWebRtcSetUp(w http.ResponseWriter, r *
 	}
 
 	backendForWeb.WebToGoConn = conn
-
-	go backendForWeb.GoSendMessageToRust()
+	done := make(chan bool)
+	go backendForWeb.GoSendMessageToRust(done)
 	logrus.Info("Setting up Frontend to goBackend connection")
-
-	select {}
+	<-done
+	if backendForRust.GoToRustConn != nil {
+		if err := backendForRust.GoToRustConn.Close(); err != nil {
+			logrus.Error("goBackend connect rustBackend closed error", err)
+			return
+		}
+		logrus.Info("goBackend to rustBackend closed connection")
+		backendForRust.GoToRustConn = nil
+		backendForWeb.GoToRustConn = nil
+	}
 }
 
-func (backendForWeb *BackendForWeb) GoSendMessageToRust() {
+func (backendForWeb *BackendForWeb) GoSendMessageToRust(done chan bool) {
 	go func() {
 		defer func() {
-			//TODO
-			backendForWeb.FrontendToGoMutex.Lock()
-			defer backendForWeb.FrontendToGoMutex.Unlock()
-			err := backendForWeb.WebToGoConn.Close()
-			if err != nil {
-				logrus.Error("Frontend to goBackend close error: ", err)
-				return
-			}
-			logrus.Info("Frontend to goBackend close successfully")
-			backendForWeb.WebToGoConn = nil
+			close(done)
 		}()
 		webToConn := backendForWeb.WebToGoConn
 		var frontendToGoEvent struct {
@@ -122,10 +119,11 @@ func (backendForWeb *BackendForWeb) GoSendMessageToRust() {
 
 func (backendForWeb *BackendForWeb) SolveCandidate(rawMessage json.RawMessage) {
 	if backendForWeb.GoToRustConn == nil {
-		logrus.Println("Backend to goBackend not ready")
+		logrus.Error("Backend to goBackend not ready")
 		return
 	}
-	log.Printf("Received ICE candidate: %s", string(rawMessage))
+	logrus.Info("Received ICE candidate: %s", string(rawMessage))
+
 	goToRustConn := backendForWeb.GoToRustConn
 
 	var candidate struct {
@@ -135,7 +133,7 @@ func (backendForWeb *BackendForWeb) SolveCandidate(rawMessage json.RawMessage) {
 	}
 
 	if err := json.Unmarshal(rawMessage, &candidate); err != nil {
-		log.Println("parse candidate failed:", err)
+		logrus.Error("parse candidate failed:", err)
 		return
 	}
 
@@ -146,11 +144,11 @@ func (backendForWeb *BackendForWeb) SolveCandidate(rawMessage json.RawMessage) {
 
 	cmdBytes, err := json.Marshal(candidateCmd)
 	if err != nil {
-		log.Println("marshal candidate command failed:", err)
+		logrus.Info("marshal candidate command failed:", err)
 		return
 	}
 	if err := goToRustConn.WriteMessage(websocket.TextMessage, cmdBytes); err != nil {
-		log.Println("forward candidate command to rust backend err:", err)
+		logrus.Info("forward candidate command to rust backend err:", err)
 	}
 }
 
@@ -196,16 +194,16 @@ func (backendForWeb *BackendForWeb) SolveOffer(sdp string) {
 func (backendForWeb *BackendForWeb) ForwardToWebConn(event *Event) {
 	conn := backendForWeb.WebToGoConn
 	if conn == nil {
-		log.Println("goBackend to rustBackend not connected")
+		logrus.Error("goBackend to rustBackend not connected")
 		return
 	}
 	marshal, err := json.Marshal(event)
 	if err != nil {
-		logrus.Println("ForwardToWebConn json.Marshal error", err)
+		logrus.Error("ForwardToWebConn json.Marshal error", err)
 		return
 	}
 	if err = conn.WriteMessage(websocket.TextMessage, marshal); err != nil {
-		logrus.Println("ForwardToWebConn conn.WriteMessage error", err)
+		logrus.Error("ForwardToWebConn conn.WriteMessage error", err)
 		return
 	}
 }

@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"github.com/gorilla/websocket"
 	"github.com/sirupsen/logrus"
-	"log"
 )
 
 type BackendForRust struct {
@@ -52,65 +51,66 @@ func (backendForRust *BackendForRust) Connect(callType string, backendForWeb *Ba
 // ListenGoToRustWs 监听go与rust的ws连接信息
 func (backendForRust *BackendForRust) ListenGoToRustWs(backendForWeb *BackendForWeb) {
 	defer func() {
-		err := backendForRust.GoToRustConn.Close()
-		if err != nil {
-			logrus.Error("goBackend connect rustBackend closed error", err)
-			return
+		if backendForRust.GoToRustConn != nil {
+			err := backendForRust.GoToRustConn.Close()
+			if err != nil {
+				logrus.Error("goBackend connect rustBackend closed error", err)
+				return
+			}
+			logrus.Info("goBackend to rustBackend closed connection")
+			backendForRust.GoToRustConn = nil
+			backendForWeb.GoToRustConn = nil
 		}
-		logrus.Info("goBackend to rustBackend closed connection")
-		backendForRust.GoToRustConn = nil
-		backendForWeb.GoToRustConn = nil
 	}()
 	for {
 		conn := backendForRust.GoToRustConn
 		if conn == nil {
-			log.Println("goBackend to rustBackend not connected")
+			logrus.Error("goBackend to rustBackend not connected")
 			continue
 		}
 		msgType, msg, err := conn.ReadMessage()
-		logrus.Debug("goBackend received from rustBackend:", msgType, msg)
 		if err != nil {
-			log.Println("Listen GoToRust Conn Message err", err)
+			logrus.Error("Listen GoToRust Conn Message err", err)
 			if websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
 				return
 			}
-			logrus.Println("Unexpected read error:", err)
+			logrus.Error("Unexpected read error:", err)
 			return
 		}
 
 		if msgType != websocket.TextMessage {
-			log.Println("Received non-text message: ", msgType)
+			logrus.Error("Received non-text message: ", msgType)
 			continue
 		}
-		log.Printf("Received from rust backend (type %d): %s", msgType, string(msg))
+		logrus.Info("Received from rust backend (type %d): %s", msgType, string(msg))
 
 		var event Event
 
 		if err = json.Unmarshal(msg, &event); err != nil {
-			logrus.Println("ListenGoToRustWs json.Unmarshal error", err)
+			logrus.Error("ListenGoToRustWs json.Unmarshal error", err)
 			continue
 		}
 
 		switch event.Event {
 		case "asrFinal":
-			log.Println("Received asrFinal message: ", event)
+			logrus.Info("Received asrFinal message: ", event)
 			backendForWeb.SolveAsrFinalEvent(&event)
 		case "asrDelta":
-			log.Println("Received asrDelta message: ", event)
+			logrus.Info("Received asrDelta message: ", event)
 		case "error":
-			logrus.Println("Received an error message: ", event)
+			logrus.Error("Received an error message: ", event)
 		case "close":
-			logrus.Println("Received close message: ", event)
+			logrus.Info("Received close message: ", event)
 		case "hangup":
-			logrus.Println("Received hangup message: ", event)
+			logrus.Info("Received hangup message: ", event)
 		case "speaking":
-			logrus.Println("Received speaking message: ", event)
+			logrus.Info("Received speaking message: ", event)
 		case "silence":
-			logrus.Println("Received silence message: ", event)
+			logrus.Info("Received silence message: ", event)
 		case "trackStart":
-			logrus.Println("Received trackStart message: ", event)
+			logrus.Info("Received trackStart message: ", event)
 		case "trackEnd":
-			logrus.Println("Received trackStop message: ", event)
+			logrus.Info("Received trackStop message: ", event)
 		}
 
 		backendForWeb.ForwardToWebConn(&event)

@@ -19,7 +19,7 @@ func Routers(router *gin.Engine, backendForWeb *service.BackendForWeb, backendFo
 	noAuth := router.Group(NoAuthPath)
 	{
 		noAuth.GET("/webrtc/setup", func(c *gin.Context) {
-			backendForWeb.HandleWebRtcSetUp(c.Writer, c.Request)
+			backendForWeb.HandleWebRtcSetUp(c.Writer, c.Request, backendForRust)
 		})
 	}
 
