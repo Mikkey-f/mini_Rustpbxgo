@@ -66,3 +66,7 @@ func main() {
 
 	select {}
 }
+
+func initDBConn() {
+
+}
