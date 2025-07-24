@@ -29,6 +29,8 @@ func Routers(router *gin.Engine, app *service.App) {
 		auth.GET("/webrtc/setup", func(c *gin.Context) {
 			app.FrontendForWeb.HandleWebRtcSetUp(c.Writer, c.Request, app.BackendForRust)
 		})
+		auth.POST("/create/robotKey", app.CreateRobotKey)
+		auth.GET("/list/robotKey", app.RobotKeyList)
 	}
 
 	// 防止阻塞
