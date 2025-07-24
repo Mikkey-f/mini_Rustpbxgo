@@ -49,6 +49,7 @@ CREATE TABLE IF NOT EXISTS robotKeys (
 CREATE TABLE IF NOT EXISTS robots (
                                       id INT AUTO_INCREMENT PRIMARY KEY COMMENT '机器人配置ID，自增主键',
                                       user_id INT NOT NULL COMMENT '关联的用户ID，外键关联users表',
+                                      name VARCHAR(100) COMMENT '名称',
                                       speed FLOAT COMMENT '语音语速，浮点型（支持0.5-2.0）',
                                       volume INT COMMENT '语音音量，整数型（数值越大音量越高，通常范围0-10）',
                                       speaker VARCHAR(50) COMMENT '根据枚举类查找腾讯服务商具体对应信息',

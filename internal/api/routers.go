@@ -18,19 +18,23 @@ func Routers(router *gin.Engine, app *service.App) {
 	//
 	//}
 	authFilter := filter.NewSessionAuth()
+	auth := router.Group(AuthPath).Use(authFilter.Auth)
 	noAuth := router.Group(NoAuthPath)
 	{
 
 		noAuth.POST("/user/register", app.Register)
 		noAuth.GET("/user/login", app.Login)
-	}
-	auth := router.Group(AuthPath).Use(authFilter.Auth)
-	{
-		auth.GET("/webrtc/setup", func(c *gin.Context) {
+		noAuth.GET("/webrtc/setup", func(c *gin.Context) {
 			app.FrontendForWeb.HandleWebRtcSetUp(c.Writer, c.Request, app.BackendForRust)
 		})
+	}
+	{
+
 		auth.POST("/create/robotKey", app.CreateRobotKey)
 		auth.GET("/list/robotKey", app.RobotKeyList)
+		auth.POST("/create/robot", app.CreateRobot)
+		auth.GET("/list/robot", app.RobotList)
+		auth.PUT("/update/robot", app.UpdateRobot)
 	}
 
 	// 防止阻塞
