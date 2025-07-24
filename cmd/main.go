@@ -57,16 +57,17 @@ func main() {
 	logger := logrus.New()
 	ctx, cancelFunc := context.WithCancel(context.Background())
 	defer cancelFunc()
+
 	llmHandler := handler.NewLLMHandler(ctx, openaiKey, openaiEndpoint, openaiSystemPrompt, logger)
 	backendForRust := service.NewBackendForRust(endPoint)
 	backendForWeb := service.NewBackendForWeb(asrOption, ttsOption, llmHandler, openaiModel)
-	go backendForRust.Connect(callType, backendForWeb)
+	app := service.NewApp()
+	app.FrontendForWeb = backendForWeb
+	app.BackendForRust = backendForRust
+
+	go backendForRust.Connect(callType, app.FrontendForWeb)
 	// backendForWeb和backendForRust两者要做好初始化
-	api.Routers(gin.Default(), backendForWeb, backendForRust)
+	api.Routers(gin.Default(), app)
 
 	select {}
-}
-
-func initDBConn() {
-
 }

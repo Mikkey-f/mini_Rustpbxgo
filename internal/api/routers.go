@@ -3,6 +3,7 @@ package api
 import (
 	"github.com/gin-gonic/gin"
 	"log"
+	"miniRustpbxgo/internal/api/filter"
 	"miniRustpbxgo/internal/service"
 )
 
@@ -11,15 +12,22 @@ const (
 	NoAuthPath = "/out"
 )
 
-func Routers(router *gin.Engine, backendForWeb *service.BackendForWeb, backendForRust *service.BackendForRust) {
+func Routers(router *gin.Engine, app *service.App) {
 	//auth := router.Group(AuthPath)
 	//{
 	//
 	//}
+	authFilter := filter.NewSessionAuth()
 	noAuth := router.Group(NoAuthPath)
 	{
-		noAuth.GET("/webrtc/setup", func(c *gin.Context) {
-			backendForWeb.HandleWebRtcSetUp(c.Writer, c.Request, backendForRust)
+
+		noAuth.POST("/user/register", app.Register)
+		noAuth.GET("/user/login", app.Login)
+	}
+	auth := router.Group(AuthPath).Use(authFilter.Auth)
+	{
+		auth.GET("/webrtc/setup", func(c *gin.Context) {
+			app.FrontendForWeb.HandleWebRtcSetUp(c.Writer, c.Request, app.BackendForRust)
 		})
 	}
 
