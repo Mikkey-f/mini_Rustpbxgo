@@ -27,6 +27,10 @@ func NewBackendForRust(endPoint string) *BackendForRust {
 	}
 }
 
+func NewBackendForRustByNoParam() *BackendForRust {
+	return &BackendForRust{}
+}
+
 // Connect 创建go到rust的ws连接
 func (backendForRust *BackendForRust) Connect(callType string, backendForWeb *BackendForWeb) {
 	for {

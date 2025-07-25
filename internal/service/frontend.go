@@ -1,10 +1,14 @@
 package service
 
 import (
+	"context"
 	"encoding/json"
+	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 	"github.com/sirupsen/logrus"
+	"gorm.io/gorm"
 	"log"
+	"miniRustpbxgo/internal/dao"
 	"miniRustpbxgo/internal/handler"
 	"miniRustpbxgo/internal/model"
 	"net/http"
@@ -17,6 +21,7 @@ type BackendForWeb struct {
 	AsrOption    *model.ASROption
 	TtsOption    *model.TTSOption
 	LLMHandler   *handler.LLMHandler
+	DB           *gorm.DB
 	Model        string
 }
 
@@ -29,6 +34,12 @@ type TtsCommand struct {
 	Streaming   bool             `json:"streaming,omitempty"`
 	EndOfStream bool             `json:"endOfStream,omitempty"`
 	Option      *model.TTSOption `json:"option,omitempty"`
+}
+
+type WebRTCSetUpReq struct {
+	ApiKey    string `json:"api_key" binding:"required"`
+	ApiSecret string `json:"api_secret" binding:"required"`
+	RobotId   int64  `json:"robot_id" binding:"required"`
 }
 
 func NewBackendForWeb(asrOption *model.ASROption, ttsOption *model.TTSOption, llmHandler *handler.LLMHandler, model string) *BackendForWeb {
@@ -46,12 +57,25 @@ func NewBackendForWeb(asrOption *model.ASROption, ttsOption *model.TTSOption, ll
 	}
 }
 
-// HandleWebRtcSetUp 处理前端与go后端关于文本信息的传递
-func (backendForWeb *BackendForWeb) HandleWebRtcSetUp(w http.ResponseWriter, r *http.Request, backendForRust *BackendForRust) {
-	//TODO
-	//defer backendForWeb.FrontendToGoMutex.Unlock()
+func NewBackendForWebByNoParam(db *gorm.DB) *BackendForWeb {
+	return &BackendForWeb{
+		Upgrader: &websocket.Upgrader{
+			ReadBufferSize:  1024,
+			WriteBufferSize: 1024,
+			// 允许cross跨域
+			CheckOrigin: func(r *http.Request) bool { return true },
+		},
+		DB: db,
+	}
+}
 
-	//backendForWeb.FrontendToGoMutex.Lock()
+// HandleWebRtcSetUp 处理前端与go后端关于文本信息的传递
+func (backendForWeb *BackendForWeb) HandleWebRtcSetUp(w http.ResponseWriter, r *http.Request, backendForRust *BackendForRust, ctx *gin.Context) {
+	//要做业务上面的逻辑检验
+	if backendForWeb.AsrOption == nil || backendForWeb.TtsOption == nil || backendForWeb.LLMHandler == nil {
+		logrus.Error("not init backendForWeb")
+		return
+	}
 	if backendForWeb.WebToGoConn != nil {
 		if err := backendForWeb.WebToGoConn.Close(); err != nil {
 			logrus.Error("frontend to goBackend closed error:", err)
@@ -65,7 +89,9 @@ func (backendForWeb *BackendForWeb) HandleWebRtcSetUp(w http.ResponseWriter, r *
 		return
 	}
 
+	// 初始化backendForWeb内容
 	backendForWeb.WebToGoConn = conn
+
 	done := make(chan bool)
 	go backendForWeb.GoSendMessageToRust(done)
 	logrus.Info("Setting up Frontend to goBackend connection")
@@ -225,7 +251,7 @@ func (backendForWeb *BackendForWeb) SolveAsrFinalEvent(event *Event) {
 		return backendForWeb.SendTTSCommandForRustBackend(segment, playID, autoHangup, nil)
 	})
 	if err != nil {
-		logrus.Println("SolveAsrFinalEvent response error:", err)
+		logrus.Error("SolveAsrFinalEvent response error:", err)
 		return
 	}
 	rep.Text = response
@@ -253,4 +279,66 @@ func (backendForWeb *BackendForWeb) SendTTSCommandForRustBackend(text string, pl
 	}
 	logrus.Println("send ttsCommand to rust backend", ttsCommand)
 	return backendForWeb.GoToRustConn.WriteJSON(ttsCommand)
+}
+
+func (backendForWeb *BackendForWeb) FrontendInit(ctx *gin.Context) {
+	var webRTCSetUpReq WebRTCSetUpReq
+	if err := ctx.ShouldBindJSON(&webRTCSetUpReq); err != nil {
+		logrus.Errorf("WebRTCSetUpReq error:%v", err)
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	repo := dao.NewRobotKeyRepo(backendForWeb.DB)
+	key, err := repo.GetRobotKeyByAPIKey(webRTCSetUpReq.ApiKey)
+	if err != nil {
+		logrus.Errorf("FrontendInit GetRobotKeyByAPIKey error:%v", err)
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if key == nil {
+		logrus.Errorf("FrontendInit GetRobotKeyByAPIKey error:key not found")
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "key not found"})
+		return
+	}
+	robotRepo := dao.NewRobotRepo(backendForWeb.DB)
+	robot, err := robotRepo.GetRobotByID(uint(webRTCSetUpReq.RobotId))
+	if err != nil {
+		logrus.Errorf("FrontendInit GetRobotByID error:%v", err)
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if robot == nil {
+		logrus.Errorf("FrontendInit GetRobotByID error:robot not found")
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "robot not found"})
+		return
+	}
+	asrOption := &model.ASROption{
+		Provider:  "tencent",
+		AppID:     key.ASRAppID,
+		SecretID:  key.ASRSecretID,
+		SecretKey: key.ASRSecretKey,
+		ModelType: key.ASRLanguage,
+		Endpoint:  key.ASRProvider,
+	}
+	ttsOption := &model.TTSOption{
+		Provider:  "tencent",
+		Speaker:   robot.Speaker,
+		AppID:     key.TTSAppID,
+		SecretID:  key.TTSSecretID,
+		SecretKey: key.TTSSecretKey,
+		Endpoint:  key.TTSProvider,
+		Speed:     robot.Speed,
+		Volume:    int32(robot.Volume),
+		Emotion:   robot.Emotion,
+	}
+	logger := logrus.New()
+	c := context.Background()
+	llmHandler := handler.NewLLMHandler(c, key.LLMApiKey, key.LLMApiUrl, robot.SystemPrompt, logger)
+	backendForWeb.LLMHandler = llmHandler
+	backendForWeb.AsrOption = asrOption
+	backendForWeb.TtsOption = ttsOption
+	backendForWeb.Model = "qwen-turbo"
+	ctx.JSON(http.StatusOK, gin.H{"code": 200,
+		"message": "初始化成功",
+	})
 }

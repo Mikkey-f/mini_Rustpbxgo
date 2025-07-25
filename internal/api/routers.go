@@ -25,7 +25,7 @@ func Routers(router *gin.Engine, app *service.App) {
 		noAuth.POST("/user/register", app.Register)
 		noAuth.GET("/user/login", app.Login)
 		noAuth.GET("/webrtc/setup", func(c *gin.Context) {
-			app.FrontendForWeb.HandleWebRtcSetUp(c.Writer, c.Request, app.BackendForRust)
+			app.FrontendForWeb.HandleWebRtcSetUp(c.Writer, c.Request, app.BackendForRust, c)
 		})
 	}
 	{
@@ -35,6 +35,9 @@ func Routers(router *gin.Engine, app *service.App) {
 		auth.POST("/create/robot", app.CreateRobot)
 		auth.GET("/list/robot", app.RobotList)
 		auth.PUT("/update/robot", app.UpdateRobot)
+		auth.GET("/webrtc/init", func(c *gin.Context) {
+			app.FrontendForWeb.FrontendInit(c)
+		})
 	}
 
 	// 防止阻塞
