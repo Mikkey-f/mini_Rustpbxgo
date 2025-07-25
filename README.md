@@ -1,4 +1,5 @@
 # MiniRustpbxgo
+[中文版](https://github.com/Mikkey-f/mini_Rustpbxgo/blob/main/docs/README_zh.md)
 
 A real-time voice communication system integrating WebRTC, Go backend, and Rust services, enabling seamless audio transmission, speech processing, and AI interaction.
 
